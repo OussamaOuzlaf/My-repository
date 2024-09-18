@@ -1,1 +1,113 @@
-fd free oussama bochra
+هذا الكود يمثل جزءًا من نظام لتسجيل الدخول وإنشاء حسابات جديدة في تطبيق يعتمد على Node.js مع استخدام مكتبات مثل `bcrypt` و`jsonwebtoken`. سأشرح الكود بشكل تفصيلي:
+
+### 1. استيراد المكتبات والموديلات
+
+```typescript
+import { userModel } from "../models/userModel"
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+```
+
+- **`userModel`**: يستورد النموذج الخاص بالمستخدمين (من ملف خارجي). يتم استخدامه للتفاعل مع قاعدة البيانات (ربما MongoDB).
+- **`bcrypt`**: مكتبة تستخدم لتجزئة (تشفير) كلمات المرور. يوفر أمانًا جيدًا من خلال استخدام تقنية "salt" لتأمين كلمات المرور.
+- **`jsonwebtoken`**: مكتبة تُستخدم لإنشاء وتوقيع JWT (JSON Web Tokens)، وهي تقنية تُستخدم لإصدار رموز معتمدة للتحقق من هوية المستخدمين.
+
+### 2. تعريف واجهة (Interface) لمعاملات التسجيل
+
+```typescript
+interface RegisterParams {
+    firstName: string
+    lastName: string
+    email: string
+    pass: string
+}
+```
+
+- يتم هنا تعريف شكل البيانات التي يجب تمريرها لدالة التسجيل (`register`). وهي تضم الحقول التالية:
+  - **firstName**: الاسم الأول.
+  - **lastName**: الاسم الأخير.
+  - **email**: البريد الإلكتروني.
+  - **pass**: كلمة المرور.
+
+### 3. دالة التسجيل `register`
+
+```typescript
+export const register = async ({ firstName, lastName, email, pass }: RegisterParams) => {
+    const findUser = await userModel.findOne({ email })
+    if (findUser) {
+        return { message: "User Already exists!", statusCode: 400 }
+    }
+    const hashPassword = await bcrypt.hash(pass, 10)
+    const newUser = new userModel({ firstName, lastName, email, pass: hashPassword })
+    await newUser.save()
+    return { data: generateKay({ firstName, lastName, email }), statusCode: 200 };
+}
+```
+
+- **البحث عن مستخدم موجود**: 
+  - `userModel.findOne({ email })` يبحث عن مستخدم في قاعدة البيانات بناءً على البريد الإلكتروني. إذا وجد المستخدم، تعود الدالة برسالة "المستخدم موجود بالفعل" مع **status code 400**.
+  
+- **تجزئة كلمة المرور**: 
+  - `bcrypt.hash(pass, 10)` تقوم بتجزئة كلمة المرور باستخدام 10 تكرارات للـ "salt". هذا يحمي كلمة المرور الأصلية من التسريب.
+
+- **إنشاء المستخدم الجديد**:
+  - يتم إنشاء مستخدم جديد باستخدام `userModel` مع الاسم الأول، الاسم الأخير، البريد الإلكتروني، وكلمة المرور المجزأة.
+
+- **حفظ المستخدم**:
+  - `newUser.save()` يحفظ المستخدم في قاعدة البيانات.
+
+- **توليد التوكن**: 
+  - `generateKay` تنشئ JWT جديد يتضمن المعلومات الأساسية للمستخدم (الاسم الأول، الاسم الأخير، البريد الإلكتروني).
+
+### 4. واجهة بيانات تسجيل الدخول
+
+```typescript
+interface LoginParams {
+    email: string
+    pass: string
+}
+```
+
+- واجهة تحدد شكل البيانات التي تُمرر لدالة تسجيل الدخول (`logIn`)، وهي:
+  - **email**: البريد الإلكتروني.
+  - **pass**: كلمة المرور.
+
+### 5. دالة تسجيل الدخول `logIn`
+
+```typescript
+export const logIn = async ({ email, pass }: LoginParams) => {
+    const findUser = await userModel.findOne({ email })
+    if (!findUser) {
+        return { data: "Your password or email is not correct", statusCode: 200 };
+    }
+    const passMatch = await bcrypt.compare(pass, findUser.pass);
+    if (passMatch) {
+        return { data: generateKay({ firstName: findUser.firstName, lastName: findUser.lastName, email }), statusCode: 200 };
+    }
+    return { data: "Your password or email is not correct", statusCode: 200 };
+}
+```
+
+- **البحث عن المستخدم**:
+  - `findUser` يبحث في قاعدة البيانات عن المستخدم بناءً على البريد الإلكتروني. إذا لم يتم العثور على المستخدم، تعود الدالة برسالة "البريد الإلكتروني أو كلمة المرور غير صحيحة".
+
+- **مقارنة كلمة المرور**:
+  - `bcrypt.compare(pass, findUser.pass)` يقارن كلمة المرور التي أدخلها المستخدم مع كلمة المرور المجزأة المحفوظة في قاعدة البيانات. إذا كانت المطابقة صحيحة، يتم توليد JWT باستخدام `generateKay` وتُعاد البيانات.
+
+- **عدم المطابقة**:
+  - إذا لم تتطابق كلمة المرور، يتم إرجاع نفس الرسالة "البريد الإلكتروني أو كلمة المرور غير صحيحة".
+
+### 6. دالة توليد JWT `generateKay`
+
+```typescript
+const generateKay = (data: any) => {
+    return jwt.sign(data, "ff")
+}
+```
+
+- **`generateKay`**: تقوم بإنشاء توقيع JWT يتضمن البيانات الممررة (الاسم الأول، الاسم الأخير، البريد الإلكتروني).
+- **`jwt.sign(data, secret)`**: يتم توقيع البيانات باستخدام مفتاح سري (في هذه الحالة السلسلة `"jFA+m)9pyn(V>y<*aWD.1EY9+{#J4e$w"`). هذا المفتاح السري يستخدم للتحقق من صحة التوكن لاحقًا.
+
+### خلاصة:
+- الكود يمثل تسجيل مستخدم جديد والتحقق من بيانات المستخدمين عند تسجيل الدخول.
+- يتم استخدام `bcrypt` لتأمين كلمات المرور بتجزئتها، و`JWT` لتوليد رموز مصادقة يتم استخدامها لتتبع هوية المستخدمين.
