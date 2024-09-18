@@ -111,3 +111,85 @@ const generateKay = (data: any) => {
 ### خلاصة:
 - الكود يمثل تسجيل مستخدم جديد والتحقق من بيانات المستخدمين عند تسجيل الدخول.
 - يتم استخدام `bcrypt` لتأمين كلمات المرور بتجزئتها، و`JWT` لتوليد رموز مصادقة يتم استخدامها لتتبع هوية المستخدمين.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+هذا الكود يمثل جزءًا من تطبيق Node.js ويستخدم للتفاعل مع قاعدة بيانات (ربما MongoDB) من خلال `productsModel`، وهو نموذج خاص بالمنتجات. يحتوي الكود على دالتين أساسيتين:
+
+### 1. استيراد نموذج المنتجات
+
+```typescript
+import { productsModel } from '../models/productsModel'
+```
+
+- **`productsModel`**: يستورد النموذج الخاص بالمنتجات من ملف خارجي (يُفترض أنه يمثل الـ Schema الخاصة بالمنتجات في قاعدة البيانات). يتم استخدامه للتفاعل مع قاعدة البيانات مثل إدخال، قراءة، وتحديث المنتجات.
+
+### 2. دالة `getAllProducts`
+
+```typescript
+export const getAllProducts = async () => {
+    return await productsModel.find()
+}
+```
+
+- **المهمة**: هذه الدالة تستخدم لاسترجاع جميع المنتجات المخزنة في قاعدة البيانات.
+- **الشرح**:
+  - `productsModel.find()`: هذه الدالة تبحث في قاعدة البيانات عن جميع المنتجات المخزنة وتُرجعها.
+  - **النتيجة**: تعود الدالة بنتيجة استعلام تحتوي على قائمة بالمنتجات المخزنة في قاعدة البيانات (على هيئة مصفوفة).
+
+### 3. دالة `seedInitialProducts`
+
+```typescript
+export const seedInitialProducts = async () => {
+    const products = [
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100},
+        {title: "Product 1", image: "image.jpeg", price: 10, stoke: 100}
+    ]
+    const existProducts = await getAllProducts();
+    if (existProducts.length === 0) {
+        await productsModel.insertMany(products)
+    }
+}
+```
+
+- **المهمة**: هذه الدالة تُستخدم لإضافة مجموعة من المنتجات الافتراضية إلى قاعدة البيانات إذا كانت قاعدة البيانات فارغة (لا توجد منتجات موجودة بالفعل).
+
+#### الخطوات:
+1. **إنشاء قائمة بالمنتجات الافتراضية**:
+   - `const products = [...]`: هنا يتم تعريف مصفوفة تحتوي على 10 منتجات افتراضية، كل منتج يحتوي على:
+     - **`title`**: اسم المنتج (في هذه الحالة "Product 1" مكرر لكل المنتجات).
+     - **`image`**: اسم الصورة الافتراضية (في هذه الحالة "image.jpeg").
+     - **`price`**: سعر المنتج (في هذه الحالة 10).
+     - **`stoke`**: المخزون المتاح من المنتج (100 وحدة).
+
+2. **التحقق من وجود المنتجات في قاعدة البيانات**:
+   - `const existProducts = await getAllProducts()`: هنا يتم استدعاء الدالة `getAllProducts` لاسترجاع جميع المنتجات الموجودة في قاعدة البيانات.
+   - `if (existProducts.length === 0)`: إذا كانت قاعدة البيانات فارغة (عدد المنتجات يساوي 0)، سيتم تنفيذ الجزء التالي.
+
+3. **إضافة المنتجات إلى قاعدة البيانات**:
+   - `await productsModel.insertMany(products)`: إذا كانت قاعدة البيانات فارغة، سيتم إدراج المنتجات الافتراضية باستخدام دالة `insertMany`، التي تضيف مجموعة من المنتجات دفعة واحدة إلى قاعدة البيانات.
+
+### الخلاصة:
+
+- **`getAllProducts`**: دالة لاسترجاع جميع المنتجات من قاعدة البيانات.
+- **`seedInitialProducts`**: دالة تُستخدم لتهيئة قاعدة البيانات بمجموعة من المنتجات الافتراضية إذا كانت قاعدة البيانات فارغة.
+
