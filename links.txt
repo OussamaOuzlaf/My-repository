@@ -193,3 +193,112 @@ export const seedInitialProducts = async () => {
 - **`getAllProducts`**: دالة لاسترجاع جميع المنتجات من قاعدة البيانات.
 - **`seedInitialProducts`**: دالة تُستخدم لتهيئة قاعدة البيانات بمجموعة من المنتجات الافتراضية إذا كانت قاعدة البيانات فارغة.
 
+
+
+
+
+
+هذا الكود يمثل نموذجًا لسلة التسوق (Cart) ونماذج العناصر التي تحتويها (Cart Items) في نظام تجارة إلكترونية باستخدام **Mongoose**، وهو مكتبة تُستخدم للتعامل مع قاعدة البيانات **MongoDB** في تطبيقات **Node.js**. سأشرح الكود بالتفصيل.
+
+### 1. استيراد المكتبات والموديلات
+
+```typescript
+import mongoose, { Schema, ObjectId, Document } from 'mongoose';
+import { IProducts } from './productsModel';
+```
+
+- **mongoose**: مكتبة للتفاعل مع قاعدة بيانات MongoDB.
+- **Schema**: يستخدم لتحديد هيكل البيانات التي سيتم تخزينها في قاعدة البيانات.
+- **ObjectId**: نوع معرف فريد يستخدمه MongoDB لكل سجل.
+- **Document**: يمثل وثيقة في MongoDB وهيكل البيانات المخزنة.
+- **IProducts**: استيراد واجهة (Interface) المنتج من ملف `productsModel` الذي يمثل هيكل بيانات المنتجات.
+
+### 2. تحديد حالة السلة (Cart Status)
+
+```typescript
+const cartStatusEnum = ["Active", "Complete"];
+```
+
+- **cartStatusEnum**: مصفوفة تحتوي على القيم الممكنة لحالة سلة التسوق.
+  - **"Active"**: تعني أن السلة لا تزال قيد الاستخدام، وربما يمكن إضافة المزيد من العناصر إليها.
+  - **"Complete"**: تعني أن السلة مكتملة، وعملية الشراء قد انتهت.
+
+### 3. تعريف واجهة (Interface) لعناصر السلة `ICartItems`
+
+```typescript
+export interface ICartItems extends Document {
+    product: IProducts;
+    unitPrice: number;
+    quantity: number;
+}
+```
+
+- **ICartItems**: تمثل واجهة لعناصر السلة، والتي تحتوي على:
+  - **product**: يمثل المنتج المضاف للسلة، وهو من النوع `IProducts`، الذي تم استيراده من موديل المنتجات.
+  - **unitPrice**: سعر الوحدة من المنتج.
+  - **quantity**: كمية المنتج التي أضافها المستخدم إلى السلة.
+
+### 4. تعريف واجهة (Interface) للسلة `ICart`
+
+```typescript
+export interface ICart extends Document {
+    userId: ObjectId | string;
+    items: ICartItems[];
+    totalAmount: number;
+    status: "Active" | "Complete";
+}
+```
+
+- **ICart**: تمثل واجهة لسلة التسوق وتحتوي على:
+  - **userId**: معرف المستخدم (من النوع `ObjectId` أو `string`) الذي يملك هذه السلة.
+  - **items**: مصفوفة تحتوي على العناصر المضافة إلى السلة (من النوع `ICartItems`).
+  - **totalAmount**: المبلغ الإجمالي للسلة، والذي يتم حسابه بناءً على مجموع أسعار الوحدات وكميات العناصر.
+  - **status**: حالة السلة، وهي إما `"Active"` أو `"Complete"`.
+
+### 5. تعريف مخطط بيانات عناصر السلة `cartItemSchema`
+
+```typescript
+const cartItemSchema = new Schema<ICartItems>({
+    product: { type: Schema.Types.ObjectId, ref: "Products", required: true },
+    unitPrice: { type: Number, required: true, default: 1 },
+    quantity: { type: Number, required: true }
+});
+```
+
+- **cartItemSchema**: مخطط (Schema) بيانات عنصر السلة، وهو يحدد الحقول التي سيتم تخزينها في قاعدة البيانات:
+  - **product**: معرف المنتج المضاف إلى السلة (من النوع `ObjectId`)، ويتم ربطه بمنتج موجود في مجموعة "Products" في قاعدة البيانات.
+  - **unitPrice**: سعر الوحدة للمنتج، وهو من النوع `Number` وحقله مطلوب.
+  - **quantity**: الكمية المضافة من المنتج، وهو أيضًا من النوع `Number` ومطلوب.
+
+### 6. تعريف مخطط بيانات السلة `cartSchema`
+
+```typescript
+const cartSchema = new Schema<ICart>({
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    items: [cartItemSchema],
+    totalAmount: { type: Number, required: true },
+    status: { type: String, enum: cartStatusEnum, default: "Active" }
+});
+```
+
+- **cartSchema**: مخطط (Schema) بيانات السلة، ويحدد الحقول التالية:
+  - **userId**: معرف المستخدم (من النوع `ObjectId`) ويجب أن يكون مرجعًا لمجموعة المستخدمين "User" في قاعدة البيانات.
+  - **items**: مصفوفة تحتوي على عناصر السلة (من النوع `cartItemSchema`).
+  - **totalAmount**: المبلغ الإجمالي للسلة (من النوع `Number`).
+  - **status**: حالة السلة، إما `"Active"` أو `"Complete"`. القيمة الافتراضية هي `"Active"`.
+
+### 7. إنشاء نموذج السلة `cartModel`
+
+```typescript
+export const cartModel = mongoose.model<ICart>("Cart", cartSchema);
+```
+
+- **cartModel**: هنا يتم إنشاء نموذج (Model) باستخدام المخطط `cartSchema` تحت اسم `"Cart"`. النموذج يمثل السلة الكاملة ويتيح لنا تنفيذ عمليات مثل الإضافة والتحديث والحذف والاستعلام في قاعدة البيانات على مجموعة `Cart`.
+
+### خلاصة:
+
+- **`ICartItems`**: واجهة تمثل عناصر السلة، تحتوي على المنتج وسعر الوحدة والكمية.
+- **`ICart`**: واجهة تمثل السلة ككل، تحتوي على معرف المستخدم، العناصر، المبلغ الإجمالي، والحالة.
+- **`cartItemSchema`**: مخطط يمثل عناصر السلة التي تحتوي على معرف المنتج، سعر الوحدة، والكمية.
+- **`cartSchema`**: مخطط يمثل السلة نفسها، ويحتوي على معرف المستخدم، العناصر، المبلغ الإجمالي، والحالة.
+- **`cartModel`**: النموذج الذي يسمح بالتفاعل مع مجموعة السلات في قاعدة البيانات، حيث يمكن تخزين السلات الجديدة أو استرجاع السلات الموجودة.
