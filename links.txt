@@ -369,3 +369,127 @@ export const getActiveCartForUser = async ({ userId }: GetCartForUser) => {
 - يتم التعامل مع البيانات باستخدام نموذج **cartModel**، والذي يفترض أنه نموذج MongoDB (أو ما يشابهه).
 
 هل تحتاج إلى توضيح إضافي حول أي جزء؟
+
+
+
+
+
+
+
+الكود الذي قدمته مكتوب بلغة TypeScript ويعمل مع قاعدة بيانات MongoDB باستخدام **Mongoose**. يهدف هذا الكود إلى إدارة عربة التسوق (**cart**) الخاصة بالمستخدم، بما في ذلك إنشاء عربة تسوق جديدة، استرجاع العربة النشطة، وإضافة منتجات إلى العربة.
+
+### الشرح التفصيلي لكل جزء من الكود:
+
+### 1. **استيراد الوحدات**
+```typescript
+import { cartModel } from "../models/cartModel";
+import { productsModel } from "../models/productsModel";
+```
+- يتم استيراد `cartModel` من ملف `cartModel`، وهو نموذج لعربة التسوق التي سيتم استخدامها في قاعدة البيانات (عادةً MongoDB).
+- يتم استيراد `productsModel` من ملف `productsModel`، وهو نموذج المنتجات في قاعدة البيانات، الذي سيستخدم للتحقق من المنتجات وإضافتها إلى العربة.
+
+### 2. **واجهة `CreateCartForUser`**
+```typescript
+interface CreateCartForUser {
+    userId: string;
+}
+```
+- هذه واجهة (`interface`) توضح أن دالة **createActiveCartForUser** تحتاج إلى كائن يحتوي على `userId` (معرف المستخدم) من نوع **string**.
+
+### 3. **دالة `createActiveCartForUser`**
+```typescript
+const createActiveCartForUser = async ({ userId }: CreateCartForUser) => {
+    const cart = await cartModel.create({ userId, totalAmount: 0 });
+    await cart.save();
+    return cart;
+}
+```
+- هذه الدالة تنشئ عربة تسوق جديدة (نشطة) للمستخدم.
+  - **`cartModel.create`**: يتم إنشاء عربة تسوق جديدة في قاعدة البيانات، مع تعيين `userId` وتحديد `totalAmount` (المبلغ الإجمالي) إلى **0** عند البدء.
+  - **`cart.save()`**: يتم حفظ عربة التسوق الجديدة في قاعدة البيانات.
+  - **`return cart`**: يتم إرجاع العربة الجديدة بعد إنشائها.
+
+### 4. **واجهة `GetCartForUser`**
+```typescript
+interface GetCartForUser {
+    userId: string;
+}
+```
+- واجهة أخرى توضح أن دالة **getActiveCartForUser** تحتاج إلى كائن يحتوي على `userId`.
+
+### 5. **دالة `getActiveCartForUser`**
+```typescript
+export const getActiveCartForUser = async ({ userId }: GetCartForUser) => {
+    let cart = await cartModel.findOne({ userId, status: "Active" });
+    if (!cart) {
+        cart = await createActiveCartForUser({ userId });
+    }
+    return cart;
+}
+```
+- هذه الدالة تهدف إلى استرجاع عربة التسوق النشطة للمستخدم.
+  - **`cartModel.findOne`**: يتم البحث عن عربة التسوق النشطة في قاعدة البيانات (حيث `status: "Active"`) المرتبطة بـ `userId`.
+  - إذا لم يتم العثور على عربة تسوق، يتم استدعاء دالة **createActiveCartForUser** لإنشاء عربة جديدة للمستخدم.
+  - في النهاية، يتم إرجاع العربة (سواء كانت جديدة أو موجودة مسبقًا).
+
+### 6. **واجهة `AddItemsToCart`**
+```typescript
+interface AddItemsToCart {
+    productId: any;
+    userId: string;
+    quantity: number;
+}
+```
+- هذه الواجهة توضح أن دالة **addItemsToCart** تحتاج إلى كائن يحتوي على:
+  - `productId`: معرف المنتج (نوعه **any** لأنه يمكن أن يكون String أو ObjectId).
+  - `userId`: معرف المستخدم (نوعه **string**).
+  - `quantity`: الكمية التي يرغب المستخدم في إضافتها من المنتج.
+
+### 7. **دالة `addItemsToCart`**
+```typescript
+export const addItemsToCart = async ({ productId, userId, quantity }: AddItemsToCart) => {
+    const cart = await getActiveCartForUser({ userId });
+    const existInCart = cart.items.find((e) => e.product.toString() === productId);
+    if (existInCart) {
+        return { data: "Item already exists in cart!", statusCode: 400 };
+    }
+    const product = await productsModel.findById(productId);
+    if (!product) {
+        return { data: "Product not found!", statusCode: 400 };
+    }
+    if (product.stoke < quantity) {
+        return { data: "Low Stock for Item", statusCode: 400 };
+    }
+
+    cart.items.push({ product: productId, unitPrice: product.price, quantity });
+    cart.totalAmount += product.price * quantity;
+    const updateCart = await cart.save();
+    return { data: updateCart, statusCode: 201 };
+}
+```
+- **استرجاع العربة النشطة للمستخدم:**
+  - يتم استدعاء **getActiveCartForUser** للحصول على العربة النشطة للمستخدم.
+  
+- **التحقق مما إذا كان المنتج موجودًا بالفعل في العربة:**
+  - يتم البحث في `cart.items` للتحقق مما إذا كان المنتج (`productId`) موجودًا بالفعل.
+  - إذا كان موجودًا، يتم إرجاع رسالة خطأ بأن المنتج موجود بالفعل في العربة، مع حالة HTTP **400** (Bad Request).
+
+- **التحقق من وجود المنتج في قاعدة البيانات:**
+  - **`productsModel.findById`**: يتم البحث عن المنتج في قاعدة البيانات بواسطة `productId`.
+  - إذا لم يتم العثور على المنتج، يتم إرجاع رسالة "Product not found" مع حالة **400**.
+
+- **التحقق من توفر الكمية المطلوبة:**
+  - يتم التحقق من أن المنتج يحتوي على الكمية المطلوبة (`product.stoke >= quantity`). إذا لم يكن هناك مخزون كافٍ، يتم إرجاع رسالة "Low Stock for Item" مع حالة **400**.
+
+- **إضافة المنتج إلى العربة:**
+  - إذا كانت جميع الشروط السابقة صحيحة، يتم إضافة المنتج إلى `cart.items` مع الكمية المطلوبة (`quantity`) وسعر الوحدة (`unitPrice`).
+  - يتم تحديث `cart.totalAmount` بإضافة مجموع سعر المنتجات المضافة (`product.price * quantity`).
+
+- **حفظ العربة المحدثة:**
+  - يتم حفظ التعديلات في قاعدة البيانات باستخدام `cart.save()`.
+  
+- **إرجاع العربة المحدثة:**
+  - في النهاية، يتم إرجاع العربة المحدثة مع حالة HTTP **201** (Created).
+
+### الخلاصة
+هذا الكود يعالج عملية إدارة عربة التسوق للمستخدم. يقوم بإنشاء عربة جديدة إذا لم تكن موجودة بالفعل، ثم يتيح إضافة منتجات إلى العربة مع التحقق من المخزون والكميات المتاحة.
